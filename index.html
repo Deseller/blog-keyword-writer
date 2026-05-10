@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>블로그 키워드 생성기</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }
+    header { background: white; border-bottom: 1px solid #e2e8f0; padding: 16px 24px; position: sticky; top: 0; z-index: 10; }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p { font-size: 13px; color: #64748b; margin-top: 2px; }
+    main { max-width: 1000px; margin: 0 auto; padding: 24px 16px; display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; }
+    h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+    .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+    .btn-primary { background: #3b82f6; color: white; width: 100%; padding: 10px; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-outline { background: white; border: 1px solid #e2e8f0; color: #475569; }
+    .btn-outline:hover { background: #f8fafc; }
+    .keyword-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; margin-bottom: 4px; }
+    .keyword-item:hover { background: #f1f5f9; }
+    .keyword-item.selected { background: #eff6ff; border: 1px solid #bfdbfe; }
+    .keyword-name { font-size: 14px; font-weight: 500; }
+    .keyword-score { font-size: 12px; color: #64748b; }
+    .score-bar { height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 4px; }
+    .score-fill { height: 100%; background: #3b82f6; border-radius: 2px; }
+    input, textarea { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; }
+    input:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px #bfdbfe; }
+    textarea { resize: vertical; line-height: 1.6; }
+    label { font-size: 13px; font-weight: 500; color: #475569; display: block; margin-bottom: 6px; }
+    .field { margin-bottom: 16px; }
+    .tag { display: inline-block; padding: 2px 8px; background: #f1f5f9; border-radius: 12px; font-size: 12px; color: #475569; margin: 2px; }
+    .status { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+    .status.loading { background: #fefce8; color: #854d0e; }
+    .status.success { background: #f0fdf4; color: #166534; }
+    .status.error { background: #fef2f2; color: #991b1b; }
+    .divider { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
+    .saved-badge { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+    .action-row { display: flex; gap: 8px; margin-top: 12px; }
+    .rank-badge { width: 20px; height: 20px; background: #3b82f6; color: white; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rank-badge.top { background: #f59e0b; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 블로그 키워드 생성기</h1>
+    <p>네이버 트렌드 기반 키워드 수집 → AI 블로그 글 생성</p>
+  </header>
+
+  <main>
+    <!-- 왼쪽: 키워드 패널 -->
+    <div>
+      <div class="card">
+        <h2>🔍 인기 키워드</h2>
+        <button class="btn btn-primary" id="fetchKeywordsBtn" onclick="fetchKeywords()">
+          트렌드 분석 시작
+        </button>
+        <div id="keywordStatus" style="margin-top:12px;"></div>
+        <div id="keywordList" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h2>✏️ 직접 입력</h2>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="customKeyword" placeholder="키워드 직접 입력" onkeydown="if(event.key==='Enter') generateWithCustom()">
+          <button class="btn btn-outline" onclick="generateWithCustom()" style="white-space:nowrap;">생성</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 글 편집 패널 -->
+    <div>
+      <div class="card">
+        <h2>📝 블로그 글 편집</h2>
+        <div id="generateStatus"></div>
+
+        <div class="field">
+          <label>제목</label>
+          <input type="text" id="postTitle" placeholder="키워드를 선택하면 자동 생성됩니다">
+        </div>
+
+        <div class="field">
+          <label>본문</label>
+          <textarea id="postContent" rows="20" placeholder="키워드를 선택하면 자동 생성됩니다"></textarea>
+        </div>
+
+        <div class="field">
+          <label>태그</label>
+          <input type="text" id="postTags" placeholder="태그1 태그2 태그3 (공백으로 구분)">
+          <div id="tagPreview" style="margin-top:6px;"></div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="action-row">
+          <button class="btn btn-outline" onclick="copyToClipboard()">📋 복사</button>
+          <button class="btn btn-success" onclick="savePost()" style="flex:1;">💾 파일 저장</button>
+        </div>
+        <div id="saveStatus" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let selectedKeyword = "";
+    let keywords = [];
+
+    // 태그 입력 시 미리보기
+    document.getElementById("postTags").addEventListener("input", function() {
+      const tags = this.value.split(/\s+/).filter(Boolean);
+      document.getElementById("tagPreview").innerHTML = tags.map(t => `<span class="tag">#${t}</span>`).join("");
+    });
+
+    // 네이버 트렌드 키워드 가져오기
+    async function fetchKeywords() {
+      const btn = document.getElementById("fetchKeywordsBtn");
+      const status = document.getElementById("keywordStatus");
+      btn.disabled = true;
+      btn.textContent = "분석 중...";
+      status.innerHTML = '<div class="status loading">⏳ 네이버 트렌드 분석 중...</div>';
+
+      try {
+        const res = await fetch("/api/keywords");
+        const data = await res.json();
+
+        if (data.success) {
+          keywords = data.keywords;
+          status.innerHTML = '<div class="status success">✅ 분석 완료!</div>';
+          renderKeywords();
+        } else {
+          status.innerHTML = `<div class="status error">❌ ${data.error}</div>`;
+        }
+      } catch (err) {
+        status.innerHTML = `<div class="status error">❌ 오류: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "트렌드 분석 시작";
+      }
+    }
+
+    function renderKeywords() {
+      const maxScore = Math.max(...keywords.map(k => k.score));
+      document.getElementById("keywordList").innerHTML = keywords.map((kw, idx) => `
+        <div class="keyword-item ${selectedKeyword === kw.keyword ? 'selected' : ''}" onclick="selectKeyword('${kw.keyword}')">
+          <div style="display:flex; align-items:center; gap:8px; flex:1;">
+            <span class="rank-badge ${idx < 3 ? 'top' : ''}">${idx + 1}</span>
+            <div style="flex:1;">
+              <div class="keyword-name">${kw.keyword}</div>
+              <div class="score-bar"><div class="score-fill" style="width:${(kw.score/maxScore*100)}%"></div></div>
+            </div>
+          </div>
+          <span class="keyword-score">${kw.score}점</span>
+        </div>
+      `).join("");
+    }
+
+    // 키워드 선택 후 글 생성
+    async function selectKeyword(keyword) {
+      selectedKeyword = keyword;
+      renderKeywords();
+      await generatePost(keyword);
+    }
+
+    // 직접 입력으로 생성
+    async function generateWithCustom() {
+      const keyword = document.getElementById("customKeyword").value.trim();
+      if (!keyword) { alert("키워드를 입력하세요."); return; }
+      selectedKeyword = keyword;
+      await generatePost(keyword);
+    }
+
+    // AI 글 생성
+    async function generatePost(keyword) {
+      const status = document.getElementById("generateStatus");
+      status.innerHTML = `<div class="status loading">⏳ "${keyword}" 블로그 글 생성 중...</div>`;
+      document.getElementById("postTitle").value = "";
+      document.getElementById("postContent").value = "";
+      document.getElementById("postTags").value = "";
+      document.getElementById("tagPreview").innerHTML = "";
+
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keyword }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById("postTitle").value = data.post.title;
+          document.getElementById("postContent").value = data.post.content;
+          const tags = data.post.tags.join(" ");
+          document.getElementById("postTags").value = tags;
+          document.getElementById("tagPreview").innerHTML = data.post.tags.map(t => `<span class="tag">#${t}</span>`).join("");
+          status.innerHTML = `<div class="status success">✅ 글 생성 완료!</div>`;
+        } else {
+          status.innerHTML = `<div class="status error">❌ ${data.error}</div>`;
+        }
+      } catch (err) {
+        status.innerHTML = `<div class="status error">❌ 오류: ${err.message}</div>`;
+      }
+    }
+
+    // 클립보드 복사
+    function copyToClipboard() {
+      const title = document.getElementById("postTitle").value;
+      const content = document.getElementById("postContent").value;
+      const tags = document.getElementById("postTags").value;
+      const text = `제목: ${title}\n\n${content}\n\n태그: ${tags}`;
+      navigator.clipboard.writeText(text).then(() => alert("클립보드에 복사됐어요!"));
+    }
+
+    // 파일 저장
+    async function savePost() {
+      const title = document.getElementById("postTitle").value;
+      const content = document.getElementById("postContent").value;
+      const tagsRaw = document.getElementById("postTags").value;
+      const tags = tagsRaw.split(/\s+/).filter(Boolean);
+
+      if (!title || !content) { alert("제목과 본문을 먼저 생성하세요."); return; }
+
+      const res = await fetch("/api/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content, tags, keyword: selectedKeyword || "키워드없음" }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        document.getElementById("saveStatus").innerHTML = `<div class="saved-badge">✅ 저장 완료: ${data.filePath}</div>`;
+      } else {
+        document.getElementById("saveStatus").innerHTML = `<div class="status error">❌ 저장 실패</div>`;
+      }
+    }
+  </script>
+</body>
+</html>
